@@ -1,0 +1,12 @@
+{
+  "name": "seclib-ai-desktop",
+  "version": "1.0.0",
+  "description": "Premium Local AI Desktop Assistant",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "dependencies": {
+    "electron": "^30.0.0"
+  }
+}

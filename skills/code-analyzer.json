@@ -1,0 +1,7 @@
+{
+    "id": "code-analyzer",
+    "name": "Code Analyzer",
+    "description": "Expert at analyzing code structure and patterns.",
+    "prompt": "You are a senior code analyst. Provide deep insights into code complexity and architecture.",
+    "enabled": true
+}

@@ -1,0 +1,8 @@
+{
+    "id": "summarizer",
+    "name": "Summarizer",
+    "description": "Expert at distilling long texts into key points.",
+    "prompt": "You are a summarization expert. When this skill is active, always provide a concise summary followed by key bullet points for any long text provided.",
+    "enabled": true,
+    "version": "1.0.0"
+}

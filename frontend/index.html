@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seclib AI Desktop</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2>Seclib AI</h2>
+                <button id="btn-new-chat" class="new-chat-btn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"></path></svg>
+                    New Chat
+                </button>
+            </div>
+            <nav class="sidebar-nav">
+                <button id="btn-chat" class="nav-item active">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                    Chat
+                </button>
+                <button id="btn-knowledge" class="nav-item">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+                    Knowledge
+                </button>
+                <button id="btn-skills" class="nav-item">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
+                    Skills
+                </button>
+            </nav>
+            <div class="sidebar-footer">
+                <button id="btn-settings" class="nav-item">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                    Settings
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Chat View -->
+            <div id="chat-view" class="view active">
+                <header class="chat-header">
+                    <div class="model-selector">
+                        <span class="model-icon">✨</span>
+                        <span class="model-name">Qwen 2.5 Coder</span>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"></path></svg>
+                    </div>
+                    <div class="system-status">
+                        <span class="status-dot"></span>
+                        Local Engine
+                    </div>
+                </header>
+                <div id="chat-messages" class="chat-messages">
+                    <!-- Welcome Screen -->
+                    <div class="welcome-container">
+                        <h1>How can I help you today?</h1>
+                    </div>
+                </div>
+                <div class="chat-input-container">
+                    <div class="chat-input-wrapper">
+                        <textarea id="chat-input" placeholder="Message Seclib AI..." rows="1"></textarea>
+                        <button id="send-btn">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"></path></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="knowledge-view" class="view">
+                <div class="view-header">
+                    <h1>Knowledge Base</h1>
+                    <div class="header-actions">
+                        <button id="rebuild-index-btn" class="secondary-btn">Rebuild Index</button>
+                        <button id="add-source-btn" class="primary-btn">Add Knowledge</button>
+                    </div>
+                </div>
+                <div id="source-list" class="source-list">
+                    <!-- Sources will appear here -->
+                </div>
+            </div>
+
+            <!-- Skills View -->
+            <div id="skills-view" class="view">
+                <div class="view-header">
+                    <h1>AI Skills</h1>
+                    <button id="add-skill-btn" class="primary-btn">Add Skill</button>
+                </div>
+                <div id="skills-list" class="skills-list">
+                    <!-- Skills will appear here -->
+                </div>
+            </div>
+
+            <!-- Settings View -->
+            <div id="settings-view" class="view">
+                <div class="view-header">
+                    <h1>Settings</h1>
+                </div>
+                <div class="settings-content">
+                    <div class="settings-group">
+                        <label>Appearance</label>
+                        <div class="setting-item">
+                            <span>Dark Mode</span>
+                            <label class="switch">
+                                <input type="checkbox" id="theme-toggle">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal for Adding Skill -->
+            <div id="skill-modal" class="modal">
+                <div class="modal-content">
+                    <h2>Create New Skill</h2>
+                    <input type="text" id="skill-name" placeholder="Skill Name (e.g., Code Analyzer)">
+                    <textarea id="skill-desc" placeholder="Description (What does this skill do?)"></textarea>
+                    <textarea id="skill-prompt" placeholder="AI Prompt (Instructions for the AI when this skill is active)"></textarea>
+                    <div class="modal-actions">
+                        <button id="close-modal" class="secondary-btn">Cancel</button>
+                        <button id="save-skill" class="primary-btn">Save Skill</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>
