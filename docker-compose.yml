@@ -1,4 +1,5 @@
 services:
+  # --- Vector Database ---
   qdrant:
     image: qdrant/qdrant:latest
     container_name: seclib-qdrant
@@ -9,7 +10,51 @@ services:
       - ./data/qdrant_storage:/qdrant/storage
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:6333/healthz"]
-      interval: 5s
+      interval: 10s
       timeout: 5s
       retries: 5
-    restart: always
+    restart: unless-stopped
+    networks:
+      - seclib-network
+
+  # --- AI Inference ---
+  ollama:
+    image: ollama/ollama:latest
+    container_name: seclib-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ./data/ollama_storage:/root/.ollama
+    restart: unless-stopped
+    networks:
+      - seclib-network
+    # GPU support (optional, commented out for maximum compatibility)
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+  # --- Backend Engine ---
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: seclib-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - QDRANT_URL=http://qdrant:6333
+      - OLLAMA_URL=http://ollama:11434
+    depends_on:
+      qdrant:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - seclib-network
+
+networks:
+  seclib-network:
+    driver: bridge

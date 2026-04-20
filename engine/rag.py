@@ -7,28 +7,33 @@ from qdrant_client.models import Distance, VectorParams, PointStruct
 class RAGManager:
     def __init__(self):
         self.knowledge_base_path = "data/knowledge"
-        self.ollama_url = "http://localhost:11434/api/embeddings"
+        base_ollama_url = os.getenv("OLLAMA_URL", "http://localhost:11434")
+        self.ollama_url = f"{base_ollama_url}/api/embeddings"
         self.model = "qwen2.5-coder:7b"
         
         if not os.path.exists(self.knowledge_base_path):
             os.makedirs(self.knowledge_base_path)
             
         # Connect to Dockerized Qdrant
-        self.client = QdrantClient(url="http://localhost:6333")
-        self._init_collection()
+        qdrant_url = os.getenv("QDRANT_URL", "http://localhost:6333")
+        self.client = QdrantClient(url=qdrant_url)
+        try:
+            self._init_collection()
+        except Exception as e:
+            print(f"⚠️ Warning: Could not connect to Qdrant at startup: {e}")
+            print("RAG features will be limited until Qdrant is active.")
 
     def _init_collection(self):
-        collections = self.client.get_collections().collections
-        exists = any(c.name == "seclib_knowledge" for c in collections)
-        if not exists:
-            # We assume qwen2.5-coder:7b embeddings or similar
-            # If using a specific embedding model, adjust size. 
-            # qwen2.5-coder usually uses 4096 or 1536 depending on the variant.
-            # For this skeleton, we'll use a standard size or auto-detect.
-            self.client.create_collection(
-                collection_name="seclib_knowledge",
-                vectors_config=VectorParams(size=1536, distance=Distance.COSINE),
-            )
+        try:
+            collections = self.client.get_collections().collections
+            exists = any(c.name == "seclib_knowledge" for c in collections)
+            if not exists:
+                self.client.create_collection(
+                    collection_name="seclib_knowledge",
+                    vectors_config=VectorParams(size=1536, distance=Distance.COSINE),
+                )
+        except Exception as e:
+            raise ConnectionError(f"Qdrant connection failed: {e}")
 
     async def _get_embedding(self, text: str) -> List[float]:
         async with httpx.AsyncClient() as client:
@@ -77,11 +82,11 @@ class RAGManager:
         if not vector:
             return ""
             
-        results = self.client.search(
+        results = self.client.query_points(
             collection_name="seclib_knowledge",
-            query_vector=vector,
+            query=vector,
             limit=top_k
-        )
+        ).points
         
         contexts = [r.payload.get("content", "") for r in results]
         return "\n---\n".join(contexts)

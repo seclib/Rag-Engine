@@ -16,7 +16,10 @@ class SecurityLayer:
         ]
         
         # Allowed tool whitelist
-        self.allowed_tools = ["ls", "cat", "grep", "find", "pwd"]
+        self.allowed_tools = [
+            "ls", "cat", "grep", "find", "pwd", "git", "python", "python3",
+            "pytest", "npm", "node", "pip", "pip3", "tail", "head", "diff"
+        ]
 
     def scan_for_secrets(self, text: str) -> List[str]:
         found_secrets = []
@@ -27,16 +30,27 @@ class SecurityLayer:
 
     def validate_command(self, command: str) -> Tuple[bool, str]:
         # Block dangerous patterns
-        blacklist = ["rm -rf", "mkfs", "dd if=", "> /dev", "chmod 777", "sudo"]
+        blacklist = [
+            "rm -rf", "mkfs", "dd if=", "> /dev", "chmod 777", "sudo", 
+            ":(){ :|:& };:", # Fork bomb
+            "sh -c", "bash -c" # Prevent nested shell escapes
+        ]
         for forbidden in blacklist:
             if forbidden in command:
                 return False, f"Security Alert: Forbidden command pattern '{forbidden}' detected."
         
-        # Whitelist check for tool execution (if applicable)
+        # Whitelist check for tool execution
         parts = command.split()
-        if parts and parts[0] not in self.allowed_tools:
-             # In a production app, we might allow more, but we flag it
-             pass 
+        if not parts:
+            return False, "Empty command."
+            
+        tool = parts[0].split("/")[-1] # Handle /usr/bin/git etc
+        if tool not in self.allowed_tools:
+             return False, f"Security Alert: Tool '{tool}' is not in the allowed whitelist."
+
+        # Path boundary check (crude but effective for this demo)
+        if ".." in command:
+            return False, "Security Alert: Path traversal attempt detected."
 
         return True, "Safe"
 

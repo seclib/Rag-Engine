@@ -3,6 +3,7 @@ import json
 from .security import security
 from .skills import SkillManager
 from .rag import RAGManager
+from .autonomous_agent import autonomous_agent
 
 class SeclibAgent:
     def __init__(self):
@@ -40,5 +41,10 @@ class SeclibAgent:
                             yield data.get("response", "")
             except Exception as e:
                 yield f"Error connecting to Ollama: {str(e)}"
+
+    async def run_autonomous_task(self, task: str, mode: str = "fix"):
+        """Wrapper to run the autonomous agent's loop."""
+        async for update in autonomous_agent.autonomous_loop(task, mode):
+            yield update
 
 agent = SeclibAgent()

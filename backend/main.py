@@ -8,6 +8,7 @@ from typing import List, Optional
 from engine.agent import agent
 from engine.skills import SkillManager
 from engine.rag import RAGManager
+from engine.security import security
 
 app = FastAPI(title="Seclib AI Backend")
 skill_manager = SkillManager()
@@ -99,6 +100,24 @@ async def rebuild_knowledge(background_tasks: BackgroundTasks):
 async def query_knowledge(text: str):
     context = await rag_manager.query_rag(text)
     return {"context": context}
+
+class AgentTaskRequest(BaseModel):
+    task: str
+    mode: str = "fix" # debug, fix, refactor
+
+@app.post("/agent/task")
+async def run_agent_task(request: AgentTaskRequest):
+    safe, msg = security.sanitize_content(request.task)
+    if not safe:
+        async def error_stream():
+            yield f"data: {json.dumps({'text': msg})}\n\n"
+        return StreamingResponse(error_stream(), media_type="text/event-stream")
+
+    async def generate():
+        async for chunk in agent.run_autonomous_task(request.task, request.mode):
+            yield f"data: {json.dumps({'text': chunk})}\n\n"
+            
+    return StreamingResponse(generate(), media_type="text/event-stream")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
