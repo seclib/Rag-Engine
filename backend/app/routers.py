@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, UploadFile, File, Query
 from fastapi.responses import StreamingResponse
 from engine.agent import agent
 from engine.autonomous_agent import autonomous_agent
-from engine.security import security
+from engine.security import security, secure_endpoint
 from .schemas import (
     QueryRequest,
     SkillCreateRequest,
@@ -44,7 +44,7 @@ async def status() -> dict:
 
 
 @router.post("/query")
-@security.secure_endpoint
+@secure_endpoint
 async def query(payload: QueryRequest):
     async def stream() -> AsyncGenerator[str, None]:
         async for chunk in agent.chat_stream(payload.text, payload.skills or []):
@@ -56,12 +56,12 @@ async def query(payload: QueryRequest):
 
 @router.get("/skills")
 async def list_skills() -> dict:
-    skills = agent.skills_manager.get_skills()
-    return {"skills": list(skills)}
+    skills = agent.skills.list_skills()
+    return {"skills": skills}
 
 
 @router.post("/skills/add")
-@security.secure_endpoint
+@secure_endpoint
 async def add_skill(payload: SkillCreateRequest) -> dict:
     skill_id = _slugify(payload.name)
     skill_data = {

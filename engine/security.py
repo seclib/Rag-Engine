@@ -60,6 +60,8 @@ class SecurityLayer:
             return False, "Security Alert: Sensitive data (API keys or private keys) detected. Operation blocked."
         return True, text
 
+security = SecurityLayer()
+
 # Middleware decorator for FastAPI endpoints
 def secure_endpoint(func: Callable):
     @functools.wraps(func)
@@ -73,5 +75,3 @@ def secure_endpoint(func: Callable):
                     raise HTTPException(status_code=403, detail=msg)
         return await func(*args, **kwargs)
     return wrapper
-
-security = SecurityLayer()
