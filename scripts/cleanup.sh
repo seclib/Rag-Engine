@@ -3,6 +3,13 @@
 
 echo "🧹 Cleaning up temporary files and logs..."
 
+# Stop all running Docker containers
+docker compose down
+
+# Kill any remaining backend or Electron processes
+pkill -f uvicorn
+pkill -f electron
+
 # Remove logs
 rm -rf backend/logs/*.log
 rm -rf frontend/logs/*.log

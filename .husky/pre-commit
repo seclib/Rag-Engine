@@ -1,0 +1,24 @@
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+# Check for node_modules
+if git diff --cached --name-only | grep -q "node_modules"; then
+  echo "Error: node_modules should not be committed."
+  exit 1
+fi
+
+# Check for .env files
+if git diff --cached --name-only | grep -q "\.env"; then
+  echo "Error: .env files should not be committed."
+  exit 1
+fi
+
+# Check for large binaries (>50MB)
+if git diff --cached --name-only | xargs -I {} du -b {} | awk '$1 > 50000000 {print $2}' | grep -q "."; then
+  echo "Error: Large binaries (>50MB) detected."
+  exit 1
+fi
+
+# All checks passed
+echo "Pre-commit checks passed."
+exit 0

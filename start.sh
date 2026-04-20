@@ -1,136 +1,85 @@
 #!/bin/bash
-# ==============================================================================
-# Seclib AI Desktop - SMART START + AUTO-HEAL DOCKER EDITION
-# ==============================================================================
 
-set -e
+# Colors for output
+GREEN="\033[0;32m"
+RED="\033[0;31m"
+YELLOW="\033[0;33m"
+NC="\033[0m" # No Color
 
-API_PORT=8000
-QDRANT_URL="http://localhost:6333/healthz"
-LOG_DIR="backend/logs"
-CHECK_INTERVAL=5
+# Helper function to print status messages
+print_status() {
+  echo -e "${GREEN}[✔]${NC} $1"
+}
 
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-NC='\033[0m'
+print_error() {
+  echo -e "${RED}[✘]${NC} $1"
+}
 
-echo -e "${BLUE}🧠 Seclib AI Desktop - SMART MODE${NC}"
+print_warning() {
+  echo -e "${YELLOW}[!]${NC} $1"
+}
 
-# =========================
-# 🧠 1. DOCKER AUTO-HEAL
-# =========================
-echo -e "${BLUE}[1/5] Checking Docker...${NC}"
+# Step 1: Check system dependencies
+print_status "Checking system dependencies..."
+if ! command -v docker &> /dev/null; then
+  print_error "Docker is not installed. Please install Docker and try again."
+  exit 1
+fi
 
-if ! command -v docker &>/dev/null; then
-    echo -e "${RED}❌ Docker not installed${NC}"
+if ! command -v node &> /dev/null; then
+  print_error "Node.js is not installed. Please install Node.js and try again."
+  exit 1
+fi
+
+if ! command -v python3 &> /dev/null; then
+  print_error "Python3 is not installed. Please install Python3 and try again."
+  exit 1
+fi
+
+if ! docker info &> /dev/null; then
+  print_error "Docker is not running. Please start Docker and try again."
+  exit 1
+fi
+print_status "All dependencies are installed and running."
+
+# Step 2: Start Docker Compose stack
+print_status "Starting Docker Compose stack..."
+docker compose up -d
+if [ $? -ne 0 ]; then
+  print_error "Failed to start Docker Compose stack. Check your docker-compose.yml file."
+  exit 1
+fi
+
+# Step 3: Wait for Qdrant readiness
+QDRANT_HEALTH_URL="http://localhost:6333/healthz"
+TIMEOUT=60
+SECONDS=0
+print_status "Waiting for Qdrant to become healthy..."
+while ! curl -fs $QDRANT_HEALTH_URL &> /dev/null; do
+  if [ $SECONDS -ge $TIMEOUT ]; then
+    print_error "Qdrant did not become healthy within $TIMEOUT seconds."
     exit 1
-fi
+  fi
+  sleep 2
+done
+print_status "Qdrant is healthy."
 
-if ! docker info &>/dev/null; then
-    echo -e "${YELLOW}⚠️ Docker not running - trying to recover...${NC}"
-
-    sudo systemctl start docker || true
-    sleep 3
-
-    if ! docker info &>/dev/null; then
-        echo -e "${RED}❌ Docker recovery failed${NC}"
-        exit 1
-    fi
-fi
-
-echo -e "${GREEN}✔ Docker OK${NC}"
-
-# =========================
-# 📦 2. START INFRA (SAFE)
-# =========================
-echo -e "${BLUE}[2/5] Starting infrastructure...${NC}"
-
-docker compose up -d --remove-orphans || {
-    echo -e "${YELLOW}⚠️ Compose failed, retrying...${NC}"
-    sleep 2
-    docker compose up -d
-}
-
-# =========================
-# 🧠 3. BACKEND HEALTH CHECK
-# =========================
-echo -e "${BLUE}[3/5] Starting backend...${NC}"
-
-mkdir -p "$LOG_DIR"
-
-if [ ! -d "backend/env" ]; then
-    echo -e "${YELLOW}📦 Creating Python env...${NC}"
-    python3 -m venv backend/env
-fi
-
-source backend/env/bin/activate
-pip install -r backend/requirements.txt >/dev/null 2>&1 || true
-
-start_backend() {
-    PYTHONPATH=. uvicorn backend.main:app \
-        --host 0.0.0.0 \
-        --port $API_PORT \
-        --log-level warning > "$LOG_DIR/api.log" 2>&1 &
-    echo $! > .backend.pid
-}
-
-start_backend
-
-sleep 3
-
-if ! curl -s http://localhost:$API_PORT >/dev/null; then
-    echo -e "${YELLOW}⚠️ Backend not responding - restarting...${NC}"
-    kill $(cat .backend.pid) 2>/dev/null || true
-    start_backend
-fi
-
-echo -e "${GREEN}✔ Backend running${NC}"
-
-# =========================
-# 🖥️ 4. FRONTEND CHECK
-# =========================
-echo -e "${BLUE}[4/5] Starting frontend...${NC}"
-
-cd frontend
-
-if [ ! -d "node_modules" ]; then
-    echo -e "${YELLOW}📦 Installing frontend deps...${NC}"
-    npm install
-fi
-
-npm start >/dev/null 2>&1 &
-UI_PID=$!
-
+# Step 4: Start FastAPI backend
+print_status "Starting FastAPI backend..."
+cd backend
+uvicorn app.main:app --host 0.0.0.0 --port 8000 &
+BACKEND_PID=$!
 cd ..
 
-# =========================
-# 🧩 5. WATCHDOG
-# =========================
-echo -e "${BLUE}[5/5] Starting watchdog...${NC}"
+# Step 5: Start Electron desktop application
+print_status "Starting Electron desktop application..."
+cd frontend
+npm start &
+ELECTRON_PID=$!
+cd ..
 
-./scripts/watchdog.sh &
-WATCHDOG_PID=$!
+# Wait for processes to finish
+wait $BACKEND_PID
+wait $ELECTRON_PID
 
-echo -e "${GREEN}🚀 SYSTEM FULLY OPERATIONAL${NC}"
-
-# =========================
-# 🛑 CLEAN EXIT
-# =========================
-cleanup() {
-    echo -e "\n${YELLOW}🛑 Shutting down system...${NC}"
-
-    kill $WATCHDOG_PID 2>/dev/null || true
-    kill $UI_PID 2>/dev/null || true
-    kill $(cat .backend.pid) 2>/dev/null || true
-
-    docker compose down >/dev/null 2>&1 || true
-
-    echo -e "${GREEN}✔ Clean shutdown complete${NC}"
-    exit 0
-}
-
-trap cleanup SIGINT SIGTERM
-wait $UI_PID
-cleanup
+print_status "Seclib AI Desktop started successfully."

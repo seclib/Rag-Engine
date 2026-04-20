@@ -8,9 +8,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="app-container">
+    <div id="app">
         <!-- Sidebar -->
-        <aside class="sidebar">
+        <aside id="sidebar">
             <div class="sidebar-header">
                 <h2>Seclib AI</h2>
                 <button id="btn-new-chat" class="new-chat-btn">
@@ -41,7 +41,7 @@
         </aside>
 
         <!-- Main Content -->
-        <main class="main-content">
+        <main id="chat-container">
             <!-- Chat View -->
             <div id="chat-view" class="view active">
                 <header class="chat-header">
@@ -125,6 +125,36 @@
                         <button id="close-modal" class="secondary-btn">Cancel</button>
                         <button id="save-skill" class="primary-btn">Save Skill</button>
                     </div>
+                </div>
+            </div>
+
+            <!-- Modal for Add Knowledge -->
+            <div id="add-knowledge-modal" class="modal hidden">
+                <div class="modal-content">
+                    <h2>Add Knowledge</h2>
+                    <input type="file" id="knowledge-upload" multiple>
+                    <button id="index-knowledge">Index</button>
+                    <button id="close-knowledge-modal">Close</button>
+                </div>
+            </div>
+
+            <!-- Modal for Add Skill -->
+            <div id="add-skill-modal" class="modal hidden">
+                <div class="modal-content">
+                    <h2>Add Skill</h2>
+                    <form id="skill-form">
+                        <label for="skill-name">Name:</label>
+                        <input type="text" id="skill-name" required>
+
+                        <label for="skill-description">Description:</label>
+                        <textarea id="skill-description" required></textarea>
+
+                        <label for="skill-prompt">Prompt:</label>
+                        <textarea id="skill-prompt" required></textarea>
+
+                        <button type="submit">Add Skill</button>
+                    </form>
+                    <button id="close-skill-modal">Close</button>
                 </div>
             </div>
         </main>

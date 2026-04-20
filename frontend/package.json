@@ -3,10 +3,140 @@
   "version": "1.0.0",
   "description": "Premium Local AI Desktop Assistant",
   "main": "main.js",
+  "homepage": "./",
   "scripts": {
-    "start": "electron ."
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "electron": "electron .",
+    "electron-dev": "ELECTRON_IS_DEV=true npm run electron",
+    "dist": "npm run build && electron-builder",
+    "dist:win": "npm run build && electron-builder --win",
+    "dist:linux": "npm run build && electron-builder --linux",
+    "dist:all": "npm run build && electron-builder --win --linux",
+    "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
-    "electron": "^41.2.1"
+    "electron": "^41.2.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.0.0",
+    "electron-builder": "^24.6.4",
+    "vite": "^4.3.9"
+  },
+  "build": {
+    "appId": "com.seclib.aidesktop",
+    "productName": "Seclib AI Desktop",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "dist/**/*",
+      "main.js",
+      "preload.js",
+      "package.json",
+      "!node_modules",
+      "!src",
+      "!public",
+      "!vite.config.js",
+      "!**/*.map"
+    ],
+    "extraResources": [
+      {
+        "from": "../scripts/start.sh",
+        "to": "start.sh"
+      },
+      {
+        "from": "../backend",
+        "to": "backend",
+        "filter": [
+          "**/*",
+          "!__pycache__",
+          "!*.pyc",
+          "!env"
+        ]
+      },
+      {
+        "from": "../requirements.txt",
+        "to": "requirements.txt"
+      },
+      {
+        "from": "../data",
+        "to": "data",
+        "filter": [
+          "**/*",
+          "!qdrant_storage",
+          "!ollama_storage"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64", "ia32"]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "requestedExecutionLevel": "asInvoker",
+      "extraResources": [
+        {
+          "from": "../scripts/windows/",
+          "to": "scripts"
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "build/installer.ico",
+      "uninstallerIcon": "build/uninstaller.ico",
+      "installerHeaderIcon": "build/icon.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Seclib AI Desktop",
+      "include": "build/installer.nsh",
+      "runAfterFinish": true
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": ["x64"]
+        },
+        {
+          "target": "deb",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "build/icon.png",
+      "category": "Development",
+      "extraResources": [
+        {
+          "from": "../scripts/linux/",
+          "to": "scripts"
+        }
+      ]
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "icon": "build/icon.icns",
+      "category": "public.app-category.developer-tools"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "fatsio",
+      "repo": "rag-engine",
+      "private": false,
+      "releaseType": "release"
+    }
   }
 }

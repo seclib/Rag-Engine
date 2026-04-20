@@ -1,0 +1,195 @@
+name: Build and Release Seclib AI Desktop
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version'
+        required: true
+        default: '1.0.0'
+
+env:
+  VERSION: ${{ github.event.inputs.version || github.ref_name }}
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        cd frontend
+        npm ci
+        python -m pip install --upgrade pip
+
+    - name: Build application
+      run: |
+        cd frontend
+        npm run build
+        npm run dist:win
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: windows-installer
+        path: frontend/dist-electron/*.exe
+
+  build-linux:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libnss3-dev libatk-bridge2.0-dev libdrm2 libxkbcommon-dev libxcomposite-dev libxdamage-dev libxrandr-dev libgbm-dev libxss1 libasound2
+
+    - name: Install appimagetool
+      run: |
+        wget -O appimagetool https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+        chmod +x appimagetool
+        sudo mv appimagetool /usr/local/bin/
+
+    - name: Install dependencies
+      run: |
+        cd frontend
+        npm ci
+        python -m pip install --upgrade pip
+
+    - name: Build application
+      run: |
+        cd frontend
+        npm run build
+        npm run dist:linux
+
+    - name: Build AppImage
+      run: ./scripts/linux/appimage.sh
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: linux-packages
+        path: |
+          frontend/dist-electron/*.AppImage
+          frontend/dist-electron/*.deb
+
+  build-macos:
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Setup Python
+      uses: actions/setup-python@v4
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        cd frontend
+        npm ci
+        python -m pip install --upgrade pip
+
+    - name: Build application
+      run: |
+        cd frontend
+        npm run build
+        npm run dist:all
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: macos-package
+        path: frontend/dist-electron/*.dmg
+
+  release:
+    needs: [build-windows, build-linux, build-macos]
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+
+    - name: Create release
+      uses: actions/create-release@v1
+      id: create_release
+      with:
+        tag_name: ${{ env.VERSION }}
+        release_name: Seclib AI Desktop ${{ env.VERSION }}
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Upload Windows installer
+      uses: actions/upload-release-asset@v1
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./windows-installer/SeclibAI-Desktop-Setup-${{ env.VERSION }}.exe
+        asset_name: SeclibAI-Desktop-Setup-${{ env.VERSION }}.exe
+        asset_content_type: application/octet-stream
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Upload Linux AppImage
+      uses: actions/upload-release-asset@v1
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./linux-packages/Seclib-AI-Desktop-${{ env.VERSION }}-x86_64.AppImage
+        asset_name: Seclib-AI-Desktop-${{ env.VERSION }}-x86_64.AppImage
+        asset_content_type: application/octet-stream
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Upload Linux DEB
+      uses: actions/upload-release-asset@v1
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./linux-packages/seclib-ai-desktop_${{ env.VERSION }}_amd64.deb
+        asset_name: seclib-ai-desktop_${{ env.VERSION }}_amd64.deb
+        asset_content_type: application/octet-stream
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Upload macOS DMG
+      uses: actions/upload-release-asset@v1
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./macos-package/SeclibAI-Desktop-${{ env.VERSION }}.dmg
+        asset_name: SeclibAI-Desktop-${{ env.VERSION }}.dmg
+        asset_content_type: application/octet-stream
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

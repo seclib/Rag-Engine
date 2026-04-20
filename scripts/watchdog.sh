@@ -1,92 +1,75 @@
 #!/bin/bash
-# ==============================================================================
-# Seclib AI Desktop - Advanced Auto-Healing Watchdog
-# ==============================================================================
 
-LOG_FILE="backend/logs/watchdog.log"
-STATE_FILE="backend/logs/system_state"
-CHECK_INTERVAL=5
-MAX_RETRIES=5
+# Colors for output
+GREEN="\033[0;32m"
+RED="\033[0;31m"
+YELLOW="\033[0;33m"
+NC="\033[0m" # No Color
 
-# Service Config
-API_URL="http://localhost:8000/"
-QDRANT_URL="http://localhost:6333/healthz"
-
-# Backoff State
-BACKEND_RETRIES=0
-DB_RETRIES=0
-
-log_event() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOG_FILE"
+# Helper function to print status messages
+print_status() {
+  echo -e "${GREEN}[✔]${NC} $1"
 }
 
-set_state() {
-    echo "$1" > "$STATE_FILE"
-    log_event "System state changed to: $1"
+print_error() {
+  echo -e "${RED}[✘]${NC} $1"
 }
 
-# Ensure log directory exists
-mkdir -p backend/logs
-touch "$LOG_FILE"
-set_state "STARTING"
+print_warning() {
+  echo -e "${YELLOW}[!]${NC} $1"
+}
 
-echo "🛡️ Watchdog active. Monitoring Seclib AI Desktop..."
+# Exponential backoff function
+backoff() {
+  local attempt=$1
+  echo $((2 ** attempt))
+}
 
-while true; do
-    sleep $CHECK_INTERVAL
-    
-    # 1. Check Backend API
-    if ! curl -s "$API_URL" >/dev/null; then
-        BACKEND_RETRIES=$((BACKEND_RETRIES + 1))
-        set_state "DEGRADED"
-        log_event "CRITICAL: Backend API unreachable (Attempt $BACKEND_RETRIES/$MAX_RETRIES)"
-        
-        if [ $BACKEND_RETRIES -le $MAX_RETRIES ]; then
-            # Exponential backoff: 2, 4, 8, 16, 32 seconds
-            WAIT=$((2 ** BACKEND_RETRIES))
-            log_event "RECOVERY: Attempting backend restart in $WAIT seconds..."
-            sleep $WAIT
-            
-            # Kill old if exists
-            fuser -k 8000/tcp >/dev/null 2>&1
-            
-            # Start Backend (assuming we are in project root)
-            source backend/env/bin/activate
-            PYTHONPATH=. uvicorn backend.main:app --host 0.0.0.0 --port 8000 --log-level warning >> backend/logs/api.log 2>&1 &
-            log_event "RECOVERY: Backend restart command issued."
-        else
-            log_event "FATAL: Backend failed after maximum retries. Manual intervention required."
-        fi
-    else
-        if [ $BACKEND_RETRIES -gt 0 ]; then
-            log_event "SUCCESS: Backend recovered."
-            BACKEND_RETRIES=0
-            set_state "HEALTHY"
-        fi
+# Monitor and restart Docker containers
+monitor_docker() {
+  local container_name=$1
+  local attempt=0
+  while true; do
+    if ! docker ps --filter "name=$container_name" --filter "status=running" | grep -q "$container_name"; then
+      print_warning "$container_name is not running. Attempting to restart..."
+      docker restart $container_name
+      if [ $? -eq 0 ]; then
+        print_status "$container_name restarted successfully."
+        attempt=0
+      else
+        print_error "Failed to restart $container_name. Retrying..."
+        sleep $(backoff $attempt)
+        attempt=$((attempt + 1))
+      fi
     fi
+    sleep 5
+  done
+}
 
-    # 2. Check Qdrant Database
-    if ! curl -s "$QDRANT_URL" | grep -q "ok"; then
-        DB_RETRIES=$((DB_RETRIES + 1))
-        set_state "DEGRADED"
-        log_event "CRITICAL: Qdrant database unresponsive (Attempt $DB_RETRIES/$MAX_RETRIES)"
-        
-        if [ $DB_RETRIES -le $MAX_RETRIES ]; then
-            log_event "RECOVERY: Restarting Qdrant container..."
-            docker compose restart qdrant >/dev/null 2>&1
-        else
-            log_event "FATAL: Database failed after maximum retries."
-        fi
-    else
-        if [ $DB_RETRIES -gt 0 ]; then
-            log_event "SUCCESS: Database recovered."
-            DB_RETRIES=0
-            set_state "HEALTHY"
-        fi
+# Monitor and restart FastAPI backend
+monitor_backend() {
+  local attempt=0
+  while true; do
+    if ! pgrep -f "uvicorn app.main:app" > /dev/null; then
+      print_warning "FastAPI backend is not running. Attempting to restart..."
+      cd backend
+      nohup uvicorn app.main:app --host 0.0.0.0 --port 8000 &> ../logs/backend.log &
+      cd ..
+      if [ $? -eq 0 ]; then
+        print_status "FastAPI backend restarted successfully."
+        attempt=0
+      else
+        print_error "Failed to restart FastAPI backend. Retrying..."
+        sleep $(backoff $attempt)
+        attempt=$((attempt + 1))
+      fi
     fi
-    
-    # Final Healthy Check
-    if [ $BACKEND_RETRIES -eq 0 ] && [ $DB_RETRIES -eq 0 ]; then
-        set_state "HEALTHY"
-    fi
-done
+    sleep 5
+  done
+}
+
+# Start monitoring services
+print_status "Starting watchdog..."
+monitor_docker qdrant &
+monitor_backend &
+wait

@@ -13,3 +13,7 @@ python3 ../engine/skills.py
 
 # Start Uvicorn
 uvicorn main:app --host 0.0.0.0 --port 8000 --log-level warning
+
+# Start the FastAPI backend
+cd backend
+uvicorn app.main:app --host 0.0.0.0 --port 8000

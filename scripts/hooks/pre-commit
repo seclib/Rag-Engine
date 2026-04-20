@@ -1,0 +1,95 @@
+#!/bin/bash
+# ==============================================================================
+# Seclib AI Desktop - Pre-commit Hook
+# ==============================================================================
+# Prevents common Git mistakes in production:
+# - node_modules commits
+# - Large files (>50MB)
+# - .env file leaks
+# - Broken rebase states
+
+set -e
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+NC='\033[0m' # No Color
+
+print_error() {
+    echo -e "${RED}❌ $1${NC}"
+}
+
+print_warning() {
+    echo -e "${YELLOW}⚠️  $1${NC}"
+}
+
+print_success() {
+    echo -e "${GREEN}✅ $1${NC}"
+}
+
+echo "🔍 Running pre-commit checks for Seclib AI Desktop..."
+
+# Check 1: Prevent node_modules commits
+if git diff --cached --name-only | grep -q "^node_modules/"; then
+    print_error "node_modules detected in commit! Remove node_modules from staging area."
+    print_error "Run: git rm -r --cached node_modules/"
+    exit 1
+fi
+
+# Check 2: Prevent .env files
+if git diff --cached --name-only | grep -E "\.env" | grep -v ".env.example"; then
+    print_error ".env file detected in commit! Never commit environment files."
+    print_error "Add .env to .gitignore and remove from staging: git rm --cached .env"
+    exit 1
+fi
+
+# Check 3: File size guard (>50MB)
+MAX_SIZE=$((50 * 1024 * 1024))  # 50MB in bytes
+
+# Check staged files
+git diff --cached --name-only | while read -r file; do
+    if [ -f "$file" ]; then
+        size=$(stat -f%z "$file" 2>/dev/null || stat -c%s "$file" 2>/dev/null)
+        if [ "$size" -gt "$MAX_SIZE" ]; then
+            print_error "File '$file' is too large ($(numfmt --to=iec-i --suffix=B $size)). Max allowed: 50MB"
+            print_error "Consider using Git LFS for large files or remove from commit."
+            exit 1
+        fi
+    fi
+done
+
+# Check 4: Prevent binary/executable files (except allowed ones)
+git diff --cached --name-only | while read -r file; do
+    if [ -f "$file" ]; then
+        # Check if file is binary/executable
+        if file "$file" | grep -qE "(executable|binary|Mach-O|PE32|ELF)"; then
+            # Allow certain binaries
+            case "$file" in
+                *.exe|*.dll|*.so|*.dylib|*.app)
+                    print_warning "Binary file '$file' detected. Ensure this is intentional."
+                    ;;
+                *)
+                    print_error "Unexpected binary file '$file' detected in commit."
+                    print_error "Binaries should not be committed. Use releases or external storage."
+                    exit 1
+                    ;;
+            esac
+        fi
+    fi
+done
+
+# Check 5: Ensure no merge conflict markers
+if git diff --cached | grep -q "^<<<<<<< "; then
+    print_error "Merge conflict markers detected! Resolve conflicts before committing."
+    exit 1
+fi
+
+# Check 6: Check for large additions (potential data leaks)
+LINES_ADDED=$(git diff --cached --stat | tail -1 | awk '{print $4+$6}')
+if [ "$LINES_ADDED" -gt 10000 ] 2>/dev/null; then
+    print_warning "Large commit detected ($LINES_ADDED lines added)."
+    print_warning "Consider splitting into smaller commits for better history."
+fi
+
+print_success "All pre-commit checks passed!"
+echo "🚀 Commit approved. Proceeding..."

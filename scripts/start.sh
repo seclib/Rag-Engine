@@ -10,71 +10,49 @@ NC='\033[0m'
 
 echo -e "${BLUE}🚀 Initializing Seclib AI Desktop System...${NC}"
 
-# --- STEP 1: Check Docker ---
-echo -e "${BLUE}[1/5] Checking Docker daemon...${NC}"
-if ! docker info > /dev/null 2>&1; then
-    echo -e "${RED}❌ Docker is not running. Please start Docker and try again.${NC}"
+# Function to check if Docker is running
+check_docker() {
+  if ! docker info >/dev/null 2>&1; then
+    echo "Docker is not running. Please start Docker and try again."
     exit 1
-fi
-echo -e "${GREEN}✅ Docker is active.${NC}"
+  fi
+}
 
-# --- STEP 2: Start Qdrant ---
-echo -e "${BLUE}[2/5] Starting Qdrant Vector Database...${NC}"
-docker compose up -d qdrant
-
-echo -e "${YELLOW}⏳ Waiting for Qdrant health check...${NC}"
-for i in {1..30}; do
-    HEALTH=$(docker inspect --format='{{json .State.Health.Status}}' seclib-qdrant 2>/dev/null)
-    if [ "$HEALTH" == "\"healthy\"" ]; then
-        echo -e "${GREEN}✅ Qdrant is healthy.${NC}"
-        break
-    fi
+# Function to wait for a container to be healthy
+wait_for_container() {
+  local container_name=$1
+  echo "Waiting for $container_name to be healthy..."
+  until [ "$(docker inspect -f '{{.State.Health.Status}}' $container_name)" == "healthy" ]; do
     sleep 2
-    if [ $i -eq 30 ]; then
-        echo -e "${RED}❌ Qdrant failed to become healthy.${NC}"
-        docker compose logs qdrant
-        exit 1
-    fi
-done
+  done
+  echo "$container_name is healthy."
+}
 
-# --- STEP 3: Check Ollama ---
-echo -e "${BLUE}[3/5] Verifying Ollama local service...${NC}"
-if ! curl -s http://localhost:11434/api/tags > /dev/null; then
-    echo -e "${RED}❌ Ollama service not found at localhost:11434.${NC}"
-    echo -e "${YELLOW}💡 Tip: Run 'ollama serve' in another terminal.${NC}"
-    exit 1
-fi
-echo -e "${GREEN}✅ Ollama detected.${NC}"
+# Check if Docker is running
+check_docker
 
-# --- STEP 4: Start Backend ---
-echo -e "${BLUE}[4/5] Starting Seclib Backend API...${NC}"
-# Setup env if missing
-if [ ! -d "backend/env" ]; then
-    python3 -m venv backend/env
-    source backend/env/bin/activate
-    pip install -r backend/requirements.txt
-fi
+# Start Qdrant container
+echo "Starting Qdrant..."
+docker compose up -d qdrant
+wait_for_container qdrant
 
-./scripts/backend_start.sh > backend/logs/out.log 2>&1 &
+# Start Ollama service
+echo "Starting Ollama..."
+docker compose up -d ollama
+
+# Start FastAPI backend
+echo "Starting FastAPI backend..."
+bash scripts/backend_start.sh &
 BACKEND_PID=$!
 
-echo -e "${YELLOW}⏳ Waiting for Backend to be ready...${NC}"
-for i in {1..20}; do
-    if curl -s http://localhost:8000/ > /dev/null; then
-        echo -e "${GREEN}✅ Backend is up.${NC}"
-        break
-    fi
-    sleep 1
-    if [ $i -eq 20 ]; then
-        echo -e "${RED}❌ Backend failed to start.${NC}"
-        kill $BACKEND_PID
-        exit 1
-    fi
-done
+# Start Electron desktop UI
+echo "Starting Electron UI..."
+bash scripts/electron_start.sh &
+ELECTRON_PID=$!
 
-# --- STEP 5: Launch UI ---
-echo -e "${BLUE}[5/5] Launching Desktop Application...${NC}"
-./scripts/electron_start.sh
+# Wait for both processes to finish
+wait $BACKEND_PID
+wait $ELECTRON_PID
 
 # Cleanup
 echo -e "${BLUE}🛑 Shutting down Seclib AI Desktop...${NC}"
